@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import asyncio
 import json
 import os
 import redis
@@ -17,6 +17,14 @@ redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=T
 
 SERVER_ENV_PYTHON = os.path.expanduser("~/Projetos/reserva_vagas_mcp_server/.venv/bin/python")
 SERVER_PATH = os.path.expanduser("~/Projetos/reserva_vagas_mcp_server/server.py")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"], 
+    allow_headers=["*"],
+)
 
 class ChatRequest(BaseModel):
     message: str

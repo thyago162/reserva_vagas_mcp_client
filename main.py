@@ -13,10 +13,10 @@ app = FastAPI()
 load_dotenv()
 client = OpenAI()
 
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_client = redis.Redis(host=os.getenv("REDIS_URL"), port=os.getenv("REDIS_PORT"), db=0, decode_responses=True)
 
-SERVER_ENV_PYTHON = os.path.expanduser("~/Projetos/reserva_vagas_mcp_server/.venv/bin/python")
-SERVER_PATH = os.path.expanduser("~/Projetos/reserva_vagas_mcp_server/server.py")
+SERVER_ENV_PYTHON = os.path.expanduser(os.getenv("MCP_SERVER_PATH"))
+SERVER_PATH = os.path.expanduser(os.getenv("SERVER_ENV_PYTHON"))
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,7 +61,6 @@ async def run_chat_agent(payload: ChatRequest):
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
-                # 1. Carrega as ferramentas do MCP
                 tools_response = await session.list_tools()
                 openai_tools = []
                 for tool in tools_response.tools:
@@ -74,16 +73,13 @@ async def run_chat_agent(payload: ChatRequest):
                         }
                     })
 
-                # 2. Recupera histórico do Redis
                 messages = obter_ou_criar_historico(payload.session_id)
 
-                # 3. Adiciona mensagem do usuário
                 messages.append({
                     "role": "user",
                     "content": payload.message
                 })
 
-                # 4. Primeira chamada à OpenAI
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=messages,
@@ -92,8 +88,6 @@ async def run_chat_agent(payload: ChatRequest):
                 )
 
                 response_message = response.choices[0].message
-
-                # Serializa a mensagem da assistente de forma segura para o histórico
                 assistant_msg_dict = {
                     "role": "assistant",
                     "content": response_message.content

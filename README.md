@@ -26,6 +26,9 @@ cp .env.example .env   # preencha as variáveis
 uvicorn <modulo>:app --reload
 ```
 
+## Sessão
+As conversas ficam no Redis, identificadas pelo id da sessão enviado pelo front, e expiram após 2 horas sem atividade.
+
 ## Variáveis de ambiente
 
 | Variável | Descrição |

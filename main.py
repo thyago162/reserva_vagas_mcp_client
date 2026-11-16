@@ -8,15 +8,28 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+import logging
+from guardrails import validar_entrada, TopicValidate
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - [%(name)s] - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(
+            "cliente.log", encoding="utf-8"
+        ),
+    ],
+)
 
 app = FastAPI()
 load_dotenv()
 client = OpenAI()
 
-redis_client = redis.Redis(host=os.getenv("REDIS_URL"), port=os.getenv("REDIS_PORT"), db=0, decode_responses=True)
+redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
-SERVER_ENV_PYTHON = os.path.expanduser(os.getenv("MCP_SERVER_PATH"))
-SERVER_PATH = os.path.expanduser(os.getenv("SERVER_ENV_PYTHON"))
+SERVER_ENV_PYTHON = os.path.expanduser(os.getenv("SERVER_ENV_PYTHON"))
+SERVER_PATH = os.path.expanduser(os.getenv("SERVER_PATH"))
+LIMITE_VOLTAS_FERRAMENTAS = 5 #Limite de voltas que o cliente pode dar para encontrar a resposta
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,17 +64,26 @@ def salvar_historico(session_id: str, messages: list):
 
 @app.post("/chat")
 async def run_chat_agent(payload: ChatRequest):
+    contador_sequence = 0
     server_params = StdioServerParameters(
         command=SERVER_ENV_PYTHON,
         args=[SERVER_PATH]
     )
 
     try:
+        entrada = validar_entrada(payload.message)
+        if entrada.mensagem_aprovada == False:
+            return {
+                "session_id": "",
+                "response": entrada.motivo_bloqueio
+            }
+            
         async with stdio_client(server_params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
                 tools_response = await session.list_tools()
+                logging.info(tools_response)
                 openai_tools = []
                 for tool in tools_response.tools:
                     openai_tools.append({
@@ -74,7 +96,6 @@ async def run_chat_agent(payload: ChatRequest):
                     })
 
                 messages = obter_ou_criar_historico(payload.session_id)
-
                 messages.append({
                     "role": "user",
                     "content": payload.message
@@ -106,7 +127,7 @@ async def run_chat_agent(payload: ChatRequest):
                 messages.append(assistant_msg_dict)
 
                 # 5. Loop seguro de execução de ferramentas
-                while response_message.tool_calls:
+                while response_message.tool_calls and contador_sequence < LIMITE_VOLTAS_FERRAMENTAS:
                     for tool_call in response_message.tool_calls:
                         tool_name = tool_call.function.name
                         try:
@@ -141,9 +162,9 @@ async def run_chat_agent(payload: ChatRequest):
                     # Serializa novamente a resposta da assistente
                     assistant_msg_dict = {
                         "role": "assistant",
-                        "content": response_message.content
+                        "content": response_message.content,
                     }
-                    if response_message.tool_calls:
+                    if response_message.tool_calls:    
                         assistant_msg_dict["tool_calls"] = [
                             {
                                 "id": tc.id,
@@ -154,18 +175,36 @@ async def run_chat_agent(payload: ChatRequest):
                                 }
                             } for tc in response_message.tool_calls
                         ]
+                        
                     messages.append(assistant_msg_dict)
-
-                # 6. Salva o histórico atualizado no Redis
-                salvar_historico(payload.session_id, messages)
-
-                # 7. Retorna a resposta final
-                return {
-                    "session_id": payload.session_id,
-                    "response": response_message.content
-                }
+                    contador_sequence += 1
+                    
+                if response_message.tool_calls:
+                    for tc in response_message.tool_calls:
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": json.dumps({"error": "Execução interrompida: limite de etapas atingido."})
+                        })
+                        
+                    resposta = "Não consegui concluir sua solicitação agora. Pode tentar novamente mais tarde?"
+                    messages.append({"role": "assistant", "content": resposta})
+                                        
+                    logging.warning(
+                        "limite de voltas atingido: session:%s voltas=%d",
+                        payload.session_id, contador_sequence
+                    )
+                else:
+                    resposta = response_message.content
+            
+            salvar_historico(payload.session_id, messages)                        
+            return {
+                "session_id": payload.session_id,
+                "response": resposta
+            }
 
     except Exception as e:
+        logging.exception(e)
         print(f"🔥 Erro bruto capturado: {repr(e)}")
         if hasattr(e, 'exceptions'):
             for sub in e.exceptions:

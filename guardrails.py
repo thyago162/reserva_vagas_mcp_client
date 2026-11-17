@@ -3,14 +3,14 @@ import re
 import unicodedata
 import logging
 
+TAMANHO_MAXIMO_MENSAGEM=500
 IGNORAR_INSTRUCOES = ("ignore as instrucoes", "ignore previous instructions", "voce agora e", "agora voce eh")
 PADROES_SEGREDOS = [
     r"eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}",
     r"Bearer\s+[a-zA-Z0-9\-\._~\+\/]+=*",
     r"\b(?:sk-|sdk-|ghp_|gho_|AKIA|AIza|xox[baprs]-)[a-zA-Z0-9_\-]{16,}\b",
-    r"(?i)\b(?:password|senha|secret|api_key|apikey|token|access_token)\b\s*[:=]\s*['\"]?[^\s'\"]{8,}['\"]?"
+    r"\b(?:password|senha|secret|api_key|apikey|token|access_token)\b\s*[:=]\s*['\"]?[^\s'\"]{8,}['\"]?"
 ]
-TAMANHO_MAXIMO_MENSAGEM=500
 REGEX_SEGREDOS = re.compile("|".join(PADROES_SEGREDOS))
 
 logger = logging.getLogger(__name__)

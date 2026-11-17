@@ -9,7 +9,7 @@ from openai import OpenAI
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 import logging
-from guardrails import validar_entrada, TopicValidate
+from guardrails import validar_entrada, validar_saida
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -201,6 +201,19 @@ async def run_chat_agent(payload: ChatRequest):
                     )
                 else:
                     resposta = response_message.content
+            
+            saida  = validar_saida(resposta)
+            if not saida.mensagem_aprovada:
+                logging.warning(
+                    "Resposta barrada: sessão:%s motivo=%s",
+                    payload.session_id, entrada.motivo_bloqueio
+                )
+                
+                return {
+                    "session_id": payload.session_id,
+                    "response": "Não consegui gerar uma resposta adequada agora. Pode reformular a pergunta?"
+                }
+                
             
             salvar_historico(payload.session_id, messages)                        
             return {

@@ -16,9 +16,9 @@ def test_validar_entrada(mensagem, esperado):
     
 @pytest.mark.parametrize("mensagem, esperado", [
     ("Olá, tudo bem?", TopicValidate(mensagem_aprovada=True, motivo_bloqueio="")),
-    ("chave sdk-", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de expor segredos.")),
+    ("sk-abcdefghijklmnopqrstuvwxyz123456", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de expor segredos.")),
     ("Nenhuma reserva encontrada.", TopicValidate(mensagem_aprovada=True, motivo_bloqueio="")),
-    ("token eyJ", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de expor segredos")),
+    ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de expor segredos")),
     ("Bearer", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de burlar segredos.")),
     
 ])

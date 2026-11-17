@@ -1,6 +1,6 @@
 import pytest
 
-from guardrails import validar_entrada, TopicValidate
+from guardrails import validar_entrada,validar_saida, TopicValidate
 
 @pytest.mark.parametrize("mensagem, esperado", [
     ("Olá, tudo bem?", TopicValidate(mensagem_aprovada=True, motivo_bloqueio="")),
@@ -13,3 +13,15 @@ from guardrails import validar_entrada, TopicValidate
 
 def test_validar_entrada(mensagem, esperado):
     assert validar_entrada(mensagem) == esperado
+    
+@pytest.mark.parametrize("mensagem, esperado", [
+    ("Olá, tudo bem?", TopicValidate(mensagem_aprovada=True, motivo_bloqueio="")),
+    ("chave sdk-", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de expor segredos.")),
+    ("Nenhuma reserva encontrada.", TopicValidate(mensagem_aprovada=True, motivo_bloqueio="")),
+    ("token eyJ", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de expor segredos")),
+    ("Bearer", TopicValidate(mensagem_aprovada=False, motivo_bloqueio="Tentativa de burlar segredos.")),
+    
+])
+
+def test_buscar_segredos(mensagem, esperado):
+    assert validar_saida(mensagem) == esperado

@@ -72,9 +72,14 @@ async def run_chat_agent(payload: ChatRequest):
 
     try:
         entrada = validar_entrada(payload.message)
-        if entrada.mensagem_aprovada == False:
+        if not entrada.mensagem_aprovada:
+            logging.warning(
+                "Requisição barrada: sessão:%s motivo=%s tamanho=%d",
+                payload.session_id, entrada.motivo_bloqueio, len(payload)
+            )
+            
             return {
-                "session_id": "",
+                "session_id": payload.session_id,
                 "response": entrada.motivo_bloqueio
             }
             
@@ -204,9 +209,8 @@ async def run_chat_agent(payload: ChatRequest):
             }
 
     except Exception as e:
-        logging.exception(e)
         print(f"🔥 Erro bruto capturado: {repr(e)}")
         if hasattr(e, 'exceptions'):
             for sub in e.exceptions:
                 print(f"🔥 Sub-exceção detalhada: {repr(sub)}")
-        raise HTTPException(status_code=500, detail=f"Erro interno no agente: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro interno no agente: Não foi possível processar sua mensagem agora. Tente novamente em instantes")
